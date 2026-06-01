@@ -6,7 +6,8 @@ A full-stack AI chatbot application with React frontend and FastAPI backend, pow
 
 - **Real-time Chat Interface**: Interactive chat UI built with React and Tailwind CSS
 - **Multi-turn Conversations**: Maintains conversation context across multiple messages
-- **Foundation Model Support**: Supports multiple AI models (Gemini, OpenAI, Claude, etc.)
+- **Foundation Model Support**: Supports Gemini and OpenAI with provider selection from the UI
+- **Multi-Provider Design**: Easily extendable to additional providers such as Claude, DeepSeek, and Grok
 - **Dark Mode UI**: Modern, dark-themed responsive interface
 - **API Integration**: RESTful backend API with CORS support
 - **Easy Setup**: Simple configuration through environment variables
@@ -63,8 +64,11 @@ pip install -r requirements.txt
 4. Set up environment variables:
 ```bash
 cp .env.example .env
-# Edit .env with your API keys
+# Edit backend/.env with your API keys and desired provider
 ```
+
+- Use `MODEL_PROVIDER=gemini` with `GEMINI_API_KEY`
+- Or use `MODEL_PROVIDER=openai` with `OPENAI_API_KEY`
 
 5. Run the backend server:
 ```bash

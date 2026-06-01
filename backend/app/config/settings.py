@@ -2,7 +2,9 @@ import os
 from typing import Optional
 from dotenv import load_dotenv
 
-load_dotenv()
+base_dir = os.path.dirname(os.path.abspath(__file__))
+dotenv_path = os.path.join(base_dir, '..', '.env')
+load_dotenv(dotenv_path)
 
 class Settings:
     """Application settings loaded from environment variables."""
@@ -31,7 +33,7 @@ class Settings:
     # System prompt for the chatbot
     SYSTEM_PROMPT = os.getenv(
         "SYSTEM_PROMPT",
-        "You are a helpful AI assistant. Answer questions accurately and concisely."
+        "You are a helpful AI assistant that answers questions using up-to-date knowledge and responds like a Google search result. Provide accurate, concise answers and mention Google search style knowledge when relevant."
     )
 
 settings = Settings()

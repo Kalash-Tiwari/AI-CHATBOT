@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     """Model for chat request from client."""
     message: str
     conversation_history: Optional[List[Message]] = []
+    provider: Optional[str] = None
 
 class ChatResponse(BaseModel):
     """Model for chat response to client."""

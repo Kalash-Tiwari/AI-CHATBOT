@@ -12,19 +12,44 @@ from datetime import datetime
 class ChatbotService:
     """Service for handling chatbot responses using foundation models."""
     
-    def __init__(self):
+    def __init__(self, provider: Optional[str] = None):
         """Initialize the chatbot service with the configured model provider."""
-        self.provider = settings.MODEL_PROVIDER.lower()
+        selected_provider = provider or settings.MODEL_PROVIDER
+        self.provider = selected_provider.lower().strip()
         self.temperature = settings.TEMPERATURE
         self.top_p = settings.TOP_P
         self.system_prompt = settings.SYSTEM_PROMPT
         self.max_history = settings.MAX_HISTORY
-        
+
+        # Provider aliases for common naming
+        if self.provider in {"gpt", "gpt-4.1", "gpt4", "openai"}:
+            self.provider = "openai"
+        elif self.provider in {"gemini", "google", "google gemini"}:
+            self.provider = "gemini"
+
         # Initialize the appropriate provider
         if self.provider == "gemini":
-            self._init_gemini()
+            try:
+                self._init_gemini()
+            except ValueError as gemini_error:
+                if settings.OPENAI_API_KEY:
+                    self.provider = "openai"
+                    self._init_openai()
+                else:
+                    raise ValueError(
+                        "GEMINI_API_KEY not set. Please set GEMINI_API_KEY or switch MODEL_PROVIDER to 'openai' with OPENAI_API_KEY."
+                    ) from gemini_error
         elif self.provider == "openai":
-            self._init_openai()
+            try:
+                self._init_openai()
+            except ValueError as openai_error:
+                if settings.GEMINI_API_KEY:
+                    self.provider = "gemini"
+                    self._init_gemini()
+                else:
+                    raise ValueError(
+                        "OPENAI_API_KEY not set. Please set OPENAI_API_KEY or switch MODEL_PROVIDER to 'gemini' with GEMINI_API_KEY."
+                    ) from openai_error
         else:
             raise ValueError(f"Unsupported model provider: {self.provider}")
     
@@ -113,31 +138,18 @@ class ChatbotService:
         except Exception as e:
             raise Exception(f"Error generating OpenAI response: {str(e)}")
 
-# Global instance
-chatbot_service: Optional[ChatbotService] = None
-
-def get_chatbot_service() -> ChatbotService:
-    """Get or create the chatbot service instance."""
-    global chatbot_service
-    if chatbot_service is None:
-        try:
-            chatbot_service = ChatbotService()
-        except ValueError as e:
-            # If API key is not set, create a mock service for development
-            print(f"Warning: {str(e)}. Using mock responses.")
-            chatbot_service = MockChatbotService()
-    return chatbot_service
-
 class MockChatbotService(ChatbotService):
     """Mock chatbot service for development/testing without API keys."""
     
     def __init__(self):
         self.provider = "mock"
         self.system_prompt = settings.SYSTEM_PROMPT
+        self.temperature = settings.TEMPERATURE
+        self.top_p = settings.TOP_P
+        self.max_history = settings.MAX_HISTORY
     
     def generate_response(self, user_message: str, conversation_history: List[Message]) -> str:
         """Return mock responses for development."""
-        # Simple mock logic
         user_msg_lower = user_message.lower()
         
         mock_responses = {
@@ -148,10 +160,8 @@ class MockChatbotService(ChatbotService):
             "bye": "Goodbye! Feel free to come back whenever you need help.",
         }
         
-        # Check for exact or partial matches
         for key, response in mock_responses.items():
             if key in user_msg_lower:
                 return response
         
-        # Default response
-        return "That's an interesting question! I'm here to help. Could you provide more details?"
+        return "I currently do not have an API key configured to fetch real search results. Please add a valid LLM provider key in the backend configuration."

@@ -5,7 +5,8 @@ API routes for the chatbot application.
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
 from app.models.conversation import ChatRequest, ChatResponse, Message
-from app.api.chatbot import get_chatbot_service
+from app.api.chatbot import ChatbotService
+from app.config.settings import settings
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -24,8 +25,9 @@ async def chat(request: ChatRequest):
         if not request.message.strip():
             raise HTTPException(status_code=400, detail="Message cannot be empty")
         
-        # Get chatbot service
-        chatbot_service = get_chatbot_service()
+        # Get chatbot service for the requested provider or default
+        provider = request.provider or settings.MODEL_PROVIDER
+        chatbot_service = ChatbotService(provider=provider)
         
         # Convert message dicts to Message objects if needed
         conversation_history = []
