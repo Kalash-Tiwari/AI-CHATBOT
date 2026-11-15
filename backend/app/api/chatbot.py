@@ -94,8 +94,33 @@ class ChatbotService:
     def _init_gemini(self):
         if not settings.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not set in environment variables")
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(settings.MODEL_NAME)
+
+        candidate_models = [
+            settings.GEMINI_MODEL,
+            settings.MODEL_NAME,
+            "gemini-3.8-flash",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+        ]
+
+        unique_candidates = []
+        for model_name in candidate_models:
+            if model_name and model_name not in unique_candidates:
+                unique_candidates.append(model_name)
+
+        last_error = None
+        for model_name in unique_candidates:
+            try:
+                genai.configure(api_key=settings.GEMINI_API_KEY)
+                self.model = genai.GenerativeModel(model_name)
+                self.model_name = model_name
+                return
+            except Exception as exc:
+                last_error = exc
+
+        raise ValueError(f"Unable to initialize a valid Gemini model: {last_error}")
 
     def _init_openai(self):
         if not settings.OPENAI_API_KEY:
@@ -339,7 +364,18 @@ This function takes a name and returns a greeting string.
             text = getattr(response, "text", str(response)).strip()
             return {"text": text or "I couldn’t generate a response right now.", "sources": web_results[:5]}
         except Exception as exc:
-            if "API key" in str(exc).lower() or "api_key" in str(exc).lower() or "quota" in str(exc).lower():
+            lowered = str(exc).lower()
+            if (
+                "api key" in lowered
+                or "api_key" in lowered
+                or "quota" in lowered
+                or "deadline" in lowered
+                or "timed out" in lowered
+                or "timeout" in lowered
+                or "network" in lowered
+                or "connection" in lowered
+                or "unavailable" in lowered
+            ):
                 return self._generate_mock_response(
                     user_message,
                     conversation_history,
@@ -347,6 +383,20 @@ This function takes a name and returns a greeting string.
                     web_results,
                     response_mode,
                 )
+            if ("model" in lowered and "not available" in lowered) or "404" in str(exc):
+                try:
+                    fallback_models = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+                    for model_name in fallback_models:
+                        if model_name == getattr(self, "model_name", ""):
+                            continue
+                        genai.configure(api_key=settings.GEMINI_API_KEY)
+                        self.model = genai.GenerativeModel(model_name)
+                        self.model_name = model_name
+                        response = self.model.generate_content(prompt if 'prompt' in locals() else user_message)
+                        text = getattr(response, "text", str(response)).strip()
+                        return {"text": text or "I couldn’t generate a response right now.", "sources": web_results[:5]}
+                except Exception:
+                    pass
             raise Exception(f"Error generating Gemini response: {str(exc)}") from exc
 
     def _generate_openai_response(
@@ -375,7 +425,18 @@ This function takes a name and returns a greeting string.
             text = response.choices[0].message.content
             return {"text": text, "sources": web_results[:5]}
         except Exception as exc:
-            if "api key" in str(exc).lower() or "invalid" in str(exc).lower() or "quota" in str(exc).lower():
+            lowered = str(exc).lower()
+            if (
+                "api key" in lowered
+                or "invalid" in lowered
+                or "quota" in lowered
+                or "deadline" in lowered
+                or "timed out" in lowered
+                or "timeout" in lowered
+                or "network" in lowered
+                or "connection" in lowered
+                or "unavailable" in lowered
+            ):
                 return self._generate_mock_response(
                     user_message,
                     conversation_history,
@@ -411,7 +472,18 @@ This function takes a name and returns a greeting string.
             text = response.content[0].text
             return {"text": text, "sources": web_results[:5]}
         except Exception as exc:
-            if "api key" in str(exc).lower() or "invalid" in str(exc).lower() or "quota" in str(exc).lower():
+            lowered = str(exc).lower()
+            if (
+                "api key" in lowered
+                or "invalid" in lowered
+                or "quota" in lowered
+                or "deadline" in lowered
+                or "timed out" in lowered
+                or "timeout" in lowered
+                or "network" in lowered
+                or "connection" in lowered
+                or "unavailable" in lowered
+            ):
                 return self._generate_mock_response(
                     user_message,
                     conversation_history,

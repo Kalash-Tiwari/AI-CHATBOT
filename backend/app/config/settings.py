@@ -23,10 +23,10 @@ class Settings:
     ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
     # Model settings
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
-    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+    MODEL_NAME = os.getenv("MODEL_NAME") or os.getenv("GEMINI_MODEL") or "gemini-3.8-flash"
     MAX_HISTORY = int(os.getenv("MAX_HISTORY", "10"))
     TEMPERATURE = float(os.getenv("TEMPERATURE", "0.7"))
     TOP_P = float(os.getenv("TOP_P", "0.9"))
