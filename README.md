@@ -1,190 +1,97 @@
-# AI Chatbot Project
+# Nexus AI Chatbot
 
-A full-stack AI chatbot application with React frontend and FastAPI backend, powered by foundation model APIs.
+Nexus AI is a full-stack conversational assistant with a modern dashboard, intelligent response handling, and optional web research. It is built with FastAPI for the API and React/Vite for the UI.
 
-## Features
+## Highlights
 
-- **Real-time Chat Interface**: Interactive chat UI built with React and Tailwind CSS
-- **Multi-turn Conversations**: Maintains conversation context across multiple messages
-- **Foundation Model Support**: Supports Gemini and OpenAI with provider selection from the UI
-- **Multi-Provider Design**: Easily extendable to additional providers such as Claude, DeepSeek, and Grok
-- **Dark Mode UI**: Modern, dark-themed responsive interface
-- **API Integration**: RESTful backend API with CORS support
-- **Easy Setup**: Simple configuration through environment variables
+- Multi-provider AI support (Gemini and OpenAI)
+- Query classification for programming, research, writing, math, and more
+- Response-mode control: concise, balanced, and detailed
+- Optional web research using public search results
+- Follow-up-friendly chat flow and suggested prompts
+- Modern glassmorphism-inspired interface
+- Graceful fallback to mock mode when no valid API key is configured
 
-## Project Structure
+## Project structure
 
-```
+```text
 AI Chatbot/
-├── frontend/                 # React frontend application
+├── backend/
+│   ├── app/
+│   ├── main.py
+│   ├── requirements.txt
+│   └── __init__.py
+├── frontend/
 │   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── App.js           # Main app component
-│   │   └── index.js         # Entry point
-│   ├── public/
-│   ├── package.json         # Frontend dependencies
-│   └── tailwind.config.js   # Tailwind CSS configuration
-│
-└── backend/                  # FastAPI backend server
-    ├── app/
-    │   ├── api/             # API routes and logic
-    │   ├── models/          # Data models and schemas
-    │   ├── config/          # Configuration settings
-    │   └── main.py          # FastAPI app initialization
-    ├── requirements.txt     # Python dependencies
-    ├── main.py              # Application entry point
-    └── .env.example         # Environment variables template
+│   ├── index.html
+│   ├── package.json
+│   ├── vite.config.js
+│   └── public/
+├── .env.example
+├── README.md
+├── QUICKSTART.md
+└── docker-compose.yml
 ```
 
-## Installation
+## Quick start
 
-### Prerequisites
-- Node.js (v16+)
-- Python (v3.9+)
-- npm or yarn
+### 1) Backend
 
-### Backend Setup
-
-1. Navigate to the backend directory:
 ```bash
 cd backend
-```
-
-2. Create a virtual environment:
-```bash
-python -m venv venv
-source venv/Scripts/activate  # On Windows
-```
-
-3. Install dependencies:
-```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Set up environment variables:
+Start the backend:
+
 ```bash
-cp .env.example .env
-# Edit backend/.env with your API keys and desired provider
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-- Use `MODEL_PROVIDER=gemini` with `GEMINI_API_KEY`
-- Or use `MODEL_PROVIDER=openai` with `OPENAI_API_KEY`
+The API will be available at http://localhost:8000.
 
-5. Run the backend server:
-```bash
-uvicorn main:app --reload
-```
+### 2) Frontend
 
-The backend will be available at `http://localhost:8000`
-
-### Frontend Setup
-
-1. Navigate to the frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
+npm run dev -- --host 0.0.0.0 --port 3000
 ```
 
-3. Start the development server:
-```bash
-npm start
-```
-
-The frontend will be available at `http://localhost:3000`
+Open http://localhost:3000 in the browser.
 
 ## Configuration
 
-### API Keys
-
-To use the chatbot, you need to configure at least one foundation model API key:
-
-- **Google Gemini**: Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-- **OpenAI**: Get your API key from [OpenAI Dashboard](https://platform.openai.com/api-keys)
-- **Anthropic Claude**: Get your API key from [Anthropic Console](https://console.anthropic.com/)
-
-Add your API key to the `.env` file:
+Copy the root `.env.example` file to `.env` and fill in your keys if you want real model responses:
 
 ```env
 MODEL_PROVIDER=gemini
-GEMINI_API_KEY=your_api_key_here
+GEMINI_API_KEY=your_key_here
+OPENAI_API_KEY=your_key_here
+MODEL_NAME=gemini-1.5-flash
 ```
 
-## Usage
+If no valid key is configured, the app automatically falls back to mock mode so the chatbot remains runnable.
 
-1. Open your browser and navigate to `http://localhost:3000`
-2. Start typing messages in the chat interface
-3. The AI will respond based on the selected foundation model
-4. The conversation history is maintained within the current session
+## API endpoints
 
-## API Endpoints
+- `GET /api/health` — health check
+- `GET /api/status` — provider status and configuration summary
+- `POST /api/chat` — send a prompt, get a reply, optional web research payload
+- `POST /api/clear` — clear the current chat session
 
-- `POST /api/chat` - Send a message and get a response
-- `GET /api/health` - Health check endpoint
-- `POST /api/clear` - Clear chat history
-- `GET /` - API information
+## Notes
 
-## Technologies Used
-
-### Frontend
-- React 18
-- Tailwind CSS
-- Axios (HTTP client)
-
-### Backend
-- FastAPI
-- Uvicorn (ASGI server)
-- Pydantic (data validation)
-- Python-dotenv (environment management)
-
-### AI Models
-- Google Gemini
-- OpenAI GPT
-- Anthropic Claude
-- And more...
-
-## Features in Development
-
-- [ ] Voice input/speech recognition
-- [ ] User authentication
-- [ ] Long-term memory using databases
-- [ ] File upload and document Q&A
-- [ ] Multilingual support
-- [ ] Integration with external tools and APIs
-- [ ] Chat persistence and history export
-
-## Troubleshooting
-
-### Backend won't start
-- Ensure all dependencies are installed: `pip install -r requirements.txt`
-- Check that your `.env` file is properly configured
-- Verify the port 8000 is not already in use
-
-### Frontend can't connect to backend
-- Ensure the backend is running on `http://localhost:8000`
-- Check CORS settings in `backend/app/config/settings.py`
-- Verify the API URL in `frontend/src/App.js`
-
-### API Key errors
-- Double-check your API key is correctly set in `.env`
-- Ensure the API key has the necessary permissions
-- Check that you're using the correct MODEL_PROVIDER
+- The chat request supports `response_mode` values: `concise`, `balanced`, and `detailed`.
+- The frontend supports a `Web research` toggle and suggested prompt chips.
+- The backend performs lightweight public search scraping for current-information queries when the toggle is enabled.
+- Results are shown as source links when available.
 
 ## License
 
-MIT License
-
-## Contributing
-
-Feel free to fork, modify, and enhance this project!
-
-## Support
-
-For issues, questions, or suggestions, please open an issue or contact the development team.
-
----
-
-Happy chatting with your AI! 🤖
+MIT
