@@ -60,10 +60,22 @@ async def chat(request: ChatRequest):
         )
 
 
+def _is_valid_key(value):
+    if value is None:
+        return False
+    normalized = value.strip()
+    if not normalized:
+        return False
+    lower = normalized.lower()
+    if lower.startswith("your_") or lower.startswith("replace_") or lower in {"dummy", "test", "example", "changeme"}:
+        return False
+    return len(normalized) >= 10
+
+
 def _evaluate_provider_status():
     configured_provider = settings.MODEL_PROVIDER.lower().strip()
-    gemini_key = bool(settings.GEMINI_API_KEY)
-    openai_key = bool(settings.OPENAI_API_KEY)
+    gemini_key = _is_valid_key(settings.GEMINI_API_KEY)
+    openai_key = _is_valid_key(settings.OPENAI_API_KEY)
 
     active_provider = None
     if configured_provider in {"gemini"} and gemini_key:

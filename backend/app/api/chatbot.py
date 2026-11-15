@@ -17,6 +17,18 @@ from app.models.conversation import Message
 class ChatbotService:
     """Service for handling chatbot responses using foundation models."""
 
+    @staticmethod
+    def _is_valid_api_key(value: Optional[str]) -> bool:
+        if value is None:
+            return False
+        normalized = value.strip()
+        if not normalized:
+            return False
+        lower = normalized.lower()
+        if lower.startswith("your_") or lower.startswith("replace_") or lower in {"dummy", "test", "example", "changeme"}:
+            return False
+        return len(normalized) >= 10
+
     def __init__(self, provider: Optional[str] = None):
         selected_provider = provider or settings.MODEL_PROVIDER
         self.provider = selected_provider.lower().strip()
@@ -30,8 +42,8 @@ class ChatbotService:
         elif self.provider in {"gemini", "google", "google gemini"}:
             self.provider = "gemini"
 
-        gemini_available = bool(settings.GEMINI_API_KEY)
-        openai_available = bool(settings.OPENAI_API_KEY)
+        gemini_available = self._is_valid_api_key(settings.GEMINI_API_KEY)
+        openai_available = self._is_valid_api_key(settings.OPENAI_API_KEY)
 
         if self.provider == "gemini":
             if gemini_available:
@@ -269,6 +281,8 @@ This function takes a name and returns a greeting string.
                 "Example: if you ask for a summary, I can structure it into key points, examples, and action steps."
             )
 
+        if not web_results:
+            return {"text": response_text, "sources": []}
         return {"text": response_text, "sources": web_results[:5]}
 
     def _generate_gemini_response(
@@ -290,6 +304,14 @@ This function takes a name and returns a greeting string.
             text = getattr(response, "text", str(response)).strip()
             return {"text": text or "I couldn’t generate a response right now.", "sources": web_results[:5]}
         except Exception as exc:
+            if "API key" in str(exc).lower() or "api_key" in str(exc).lower() or "quota" in str(exc).lower():
+                return self._generate_mock_response(
+                    user_message,
+                    conversation_history,
+                    query_category,
+                    web_results,
+                    response_mode,
+                )
             raise Exception(f"Error generating Gemini response: {str(exc)}") from exc
 
     def _generate_openai_response(
@@ -318,6 +340,14 @@ This function takes a name and returns a greeting string.
             text = response.choices[0].message.content
             return {"text": text, "sources": web_results[:5]}
         except Exception as exc:
+            if "api key" in str(exc).lower() or "invalid" in str(exc).lower() or "quota" in str(exc).lower():
+                return self._generate_mock_response(
+                    user_message,
+                    conversation_history,
+                    query_category,
+                    web_results,
+                    response_mode,
+                )
             raise Exception(f"Error generating OpenAI response: {str(exc)}") from exc
 
 
