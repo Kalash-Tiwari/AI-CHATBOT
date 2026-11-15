@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import ChatInterface from './components/ChatInterface';
+import ChatInterface from './components/ChatInterface.jsx';
 import './App.css';
 
 const API_BASE_URL = 'http://localhost:8000/api';
