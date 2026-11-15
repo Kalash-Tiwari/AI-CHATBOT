@@ -10,6 +10,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [provider, setProvider] = useState('gemini');
+  const [configStatus, setConfigStatus] = useState(null);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -19,6 +20,22 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const fetchConfigStatus = async () => {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/status`);
+        setConfigStatus(response.data);
+        if (response.data.active_provider && response.data.active_provider !== 'mock') {
+          setProvider(response.data.active_provider);
+        }
+      } catch (err) {
+        setConfigStatus({ status: 'unknown', message: 'Unable to verify backend provider configuration.' });
+      }
+    };
+
+    fetchConfigStatus();
+  }, []);
 
   const sendMessage = async (userMessage) => {
     if (!userMessage.trim()) return;
@@ -56,7 +73,15 @@ function App() {
 
       setMessages(prev => [...prev, botMessage]);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to get response from the AI. Please try again.');
+      const backendDetail = err.response?.data?.detail;
+      const missingKeyError = backendDetail && backendDetail.includes('not set in environment variables');
+      if (missingKeyError) {
+        setError(
+          'No valid LLM API key is configured. Please update backend/.env with a valid GEMINI_API_KEY or OPENAI_API_KEY and restart the backend.'
+        );
+      } else {
+        setError(backendDetail || 'Failed to get response from the AI. Please try again.');
+      }
       console.error('Error:', err);
     } finally {
       setLoading(false);
@@ -71,11 +96,23 @@ function App() {
   return (
     <div className="flex flex-col h-screen bg-gradient-to-br from-dark-bg to-dark-card">
       <header className="bg-gradient-to-r from-accent-blue to-blue-600 text-white p-4 shadow-lg">
-        <h1 className="text-2xl font-bold">Enterprise AI Chatbot Platform</h1>
-        <p className="text-blue-100 text-sm">Multi-provider LLM support with conversational context and enterprise-ready architecture</p>
+        <h1 className="text-2xl font-bold">Enterprise AI Research Assistant</h1>
+        <p className="text-blue-100 text-sm">Multi-provider research assistant with conversational context and enterprise-grade architecture</p>
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {configStatus && configStatus.status !== 'ready' && (
+          <div className="bg-yellow-600/20 border border-yellow-500 text-yellow-100 px-4 py-3 rounded-lg">
+            <strong className="font-semibold">Provider configuration issue:</strong>
+            <p className="mt-1 text-sm">
+              {configStatus.status === 'mock'
+                ? 'No valid LLM provider is configured. The app is running in mock mode until a valid GEMINI_API_KEY or OPENAI_API_KEY is set.'
+                : configStatus.missing_keys && configStatus.missing_keys.length > 0
+                ? `Missing ${configStatus.missing_keys.join(', ')} for MODEL_PROVIDER=${configStatus.configured_provider}.`
+                : 'No valid LLM provider is configured. Please set GEMINI_API_KEY or OPENAI_API_KEY in backend/.env.'}
+            </p>
+          </div>
+        )}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
           <div>
             <p className="text-sm text-gray-300">Select an AI provider for your conversation.</p>
@@ -141,7 +178,7 @@ function App() {
         <div ref={messagesEndRef} />
       </div>
 
-      <ChatInterface onSendMessage={sendMessage} isSending={loading} onClear={clearChat} />
+      <ChatInterface onSendMessage={sendMessage} isSending={loading} onClear={clearChat} disabled={configStatus?.status === 'unknown'} />
     </div>
   );
 }

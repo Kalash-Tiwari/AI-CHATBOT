@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const ChatInterface = ({ onSendMessage, isSending, onClear }) => {
+const ChatInterface = ({ onSendMessage, isSending, onClear, disabled }) => {
   const [inputValue, setInputValue] = useState('');
 
   const handleSend = () => {
@@ -34,13 +34,13 @@ const ChatInterface = ({ onSendMessage, isSending, onClear }) => {
           onChange={(e) => setInputValue(e.target.value)}
           onKeyPress={handleKeyPress}
           placeholder="Type your message here... (Shift+Enter for new line)"
-          disabled={isSending}
+          disabled={isSending || disabled}
           rows="3"
           className="flex-1 bg-gray-800 text-white border border-dark-border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent-blue resize-none disabled:opacity-50"
         />
         <button
           onClick={handleSend}
-          disabled={isSending || !inputValue.trim()}
+          disabled={isSending || disabled || !inputValue.trim()}
           className="bg-accent-blue hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors disabled:bg-gray-600 disabled:cursor-not-allowed self-end h-fit"
         >
           {isSending ? 'Sending...' : 'Send'}

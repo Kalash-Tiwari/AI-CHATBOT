@@ -57,10 +57,51 @@ async def chat(request: ChatRequest):
             detail=f"Error processing chat: {str(e)}"
         )
 
+def _evaluate_provider_status():
+    configured_provider = settings.MODEL_PROVIDER.lower().strip()
+    gemini_key = bool(settings.GEMINI_API_KEY)
+    openai_key = bool(settings.OPENAI_API_KEY)
+
+    active_provider = None
+    if configured_provider in {"gemini"} and gemini_key:
+        active_provider = "gemini"
+    elif configured_provider in {"openai", "gpt", "gpt-4.1", "gpt4"} and openai_key:
+        active_provider = "openai"
+    elif gemini_key:
+        active_provider = "gemini"
+    elif openai_key:
+        active_provider = "openai"
+    else:
+        active_provider = "mock"
+
+    missing_keys = []
+    if configured_provider == "gemini" and not gemini_key:
+        missing_keys.append("GEMINI_API_KEY")
+    if configured_provider == "openai" and not openai_key:
+        missing_keys.append("OPENAI_API_KEY")
+    if configured_provider not in {"gemini", "openai", "gpt", "gpt-4.1", "gpt4"}:
+        missing_keys.append("Unsupported MODEL_PROVIDER")
+
+    status = "ready" if active_provider in {"gemini", "openai"} else "mock"
+    return {
+        "status": status,
+        "configured_provider": settings.MODEL_PROVIDER,
+        "active_provider": active_provider,
+        "gemini_key_set": gemini_key,
+        "openai_key_set": openai_key,
+        "missing_keys": missing_keys,
+        "message": "No real provider key configured; running in mock mode." if active_provider == "mock" else "Provider configuration is valid."
+    }
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@router.get("/status")
+async def status_check():
+    """Status endpoint to verify provider configuration."""
+    return _evaluate_provider_status()
 
 @router.post("/clear")
 async def clear_chat():

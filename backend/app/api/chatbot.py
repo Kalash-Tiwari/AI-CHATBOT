@@ -28,31 +28,35 @@ class ChatbotService:
             self.provider = "gemini"
 
         # Initialize the appropriate provider
+        gemini_available = bool(settings.GEMINI_API_KEY)
+        openai_available = bool(settings.OPENAI_API_KEY)
+
         if self.provider == "gemini":
-            try:
+            if gemini_available:
                 self._init_gemini()
-            except ValueError as gemini_error:
-                if settings.OPENAI_API_KEY:
-                    self.provider = "openai"
-                    self._init_openai()
-                else:
-                    raise ValueError(
-                        "GEMINI_API_KEY not set. Please set GEMINI_API_KEY or switch MODEL_PROVIDER to 'openai' with OPENAI_API_KEY."
-                    ) from gemini_error
-        elif self.provider == "openai":
-            try:
+            elif openai_available:
+                self.provider = "openai"
                 self._init_openai()
-            except ValueError as openai_error:
-                if settings.GEMINI_API_KEY:
-                    self.provider = "gemini"
-                    self._init_gemini()
-                else:
-                    raise ValueError(
-                        "OPENAI_API_KEY not set. Please set OPENAI_API_KEY or switch MODEL_PROVIDER to 'gemini' with GEMINI_API_KEY."
-                    ) from openai_error
+            else:
+                self._activate_mock()
+        elif self.provider == "openai":
+            if openai_available:
+                self._init_openai()
+            elif gemini_available:
+                self.provider = "gemini"
+                self._init_gemini()
+            else:
+                self._activate_mock()
         else:
-            raise ValueError(f"Unsupported model provider: {self.provider}")
-    
+            if gemini_available:
+                self.provider = "gemini"
+                self._init_gemini()
+            elif openai_available:
+                self.provider = "openai"
+                self._init_openai()
+            else:
+                self._activate_mock()
+
     def _init_gemini(self):
         """Initialize Google Gemini API."""
         if not settings.GEMINI_API_KEY:
@@ -86,6 +90,31 @@ class ChatbotService:
             return self._generate_gemini_response(user_message, recent_history)
         elif self.provider == "openai":
             return self._generate_openai_response(user_message, recent_history)
+        elif self.provider == "mock":
+            return self._generate_mock_response(user_message, recent_history)
+        raise Exception(f"No available provider could be initialized for {self.provider}")
+    
+    def _activate_mock(self):
+        self.provider = "mock"
+        self.model = None
+        self.client = None
+
+    def _generate_mock_response(self, user_message: str, conversation_history: List[Message]) -> str:
+        user_msg_lower = user_message.lower()
+        mock_responses = {
+            "hello": "Hello! I am running in mock mode because no API key is configured. Please add GEMINI_API_KEY or OPENAI_API_KEY in backend/.env for real responses.",
+            "how are you": "I'm a mock chatbot running locally. Configure an API key to use a real language model.",
+            "what is your name": "I'm an AI Chatbot mock responder. Configure a real provider in backend/.env for full functionality.",
+            "what can you do": "I can simulate responses locally. Add a valid API key to get real Google-style search answer formatting.",
+            "bye": "Goodbye! Add a provider key and restart the backend to use live AI responses."
+        }
+        for key, response in mock_responses.items():
+            if key in user_msg_lower:
+                return response
+        return (
+            "I currently do not have an API key configured to fetch real search results. "
+            "Please add a valid GEMINI_API_KEY or OPENAI_API_KEY in backend/.env and restart the backend."
+        )
     
     def _generate_gemini_response(self, user_message: str, conversation_history: List[Message]) -> str:
         """Generate response using Google Gemini."""
@@ -102,7 +131,7 @@ class ChatbotService:
             
             # Get response for the current message
             response = chat.send_message(user_message, stream=False)
-            return response.text
+            return f"According to Google-style search results: {response.text}"
         except Exception as e:
             raise Exception(f"Error generating Gemini response: {str(e)}")
     

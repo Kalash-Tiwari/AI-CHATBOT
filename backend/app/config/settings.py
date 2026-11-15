@@ -3,7 +3,7 @@ from typing import Optional
 from dotenv import load_dotenv
 
 base_dir = os.path.dirname(os.path.abspath(__file__))
-dotenv_path = os.path.join(base_dir, '..', '.env')
+dotenv_path = os.path.abspath(os.path.join(base_dir, '..', '..', '.env'))
 load_dotenv(dotenv_path)
 
 class Settings:
@@ -33,7 +33,7 @@ class Settings:
     # System prompt for the chatbot
     SYSTEM_PROMPT = os.getenv(
         "SYSTEM_PROMPT",
-        "You are a helpful AI assistant that answers questions using up-to-date knowledge and responds like a Google search result. Provide accurate, concise answers and mention Google search style knowledge when relevant."
+        "You are an AI assistant that answers questions in a style similar to Google search results. Provide concise summaries, highlight the most relevant facts, and phrase replies like search result snippets where appropriate."
     )
 
 settings = Settings()
