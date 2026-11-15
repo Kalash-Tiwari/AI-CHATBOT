@@ -1,19 +1,23 @@
 """
 Chatbot service for interacting with foundation model APIs.
-Supports multiple providers: Gemini, OpenAI, Anthropic, etc.
 """
 
-from typing import List, Optional
+import re
+from typing import Any, Dict, List, Optional
+from urllib.parse import quote
+
+import google.generativeai as genai
+import requests
+from bs4 import BeautifulSoup
+
 from app.config.settings import settings
 from app.models.conversation import Message
-import google.generativeai as genai
-from datetime import datetime
+
 
 class ChatbotService:
     """Service for handling chatbot responses using foundation models."""
-    
+
     def __init__(self, provider: Optional[str] = None):
-        """Initialize the chatbot service with the configured model provider."""
         selected_provider = provider or settings.MODEL_PROVIDER
         self.provider = selected_provider.lower().strip()
         self.temperature = settings.TEMPERATURE
@@ -21,13 +25,11 @@ class ChatbotService:
         self.system_prompt = settings.SYSTEM_PROMPT
         self.max_history = settings.MAX_HISTORY
 
-        # Provider aliases for common naming
         if self.provider in {"gpt", "gpt-4.1", "gpt4", "openai"}:
             self.provider = "openai"
         elif self.provider in {"gemini", "google", "google gemini"}:
             self.provider = "gemini"
 
-        # Initialize the appropriate provider
         gemini_available = bool(settings.GEMINI_API_KEY)
         openai_available = bool(settings.OPENAI_API_KEY)
 
@@ -58,139 +60,288 @@ class ChatbotService:
                 self._activate_mock()
 
     def _init_gemini(self):
-        """Initialize Google Gemini API."""
         if not settings.GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY not set in environment variables")
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(settings.MODEL_NAME)
-    
+
     def _init_openai(self):
-        """Initialize OpenAI API."""
         if not settings.OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY not set in environment variables")
-        # Import here to avoid dependency if not using OpenAI
         from openai import OpenAI
+
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
-    
-    def generate_response(self, user_message: str, conversation_history: List[Message]) -> str:
-        """
-        Generate a response using the foundation model.
-        
-        Args:
-            user_message: The user's current message
-            conversation_history: List of previous messages for context
-        
-        Returns:
-            The AI-generated response
-        """
-        # Limit conversation history to prevent token overflow
+
+    def generate_response(
+        self,
+        user_message: str,
+        conversation_history: List[Message],
+        web_search: bool = False,
+        response_mode: str = "balanced",
+    ) -> Dict[str, Any]:
         recent_history = conversation_history[-self.max_history:] if conversation_history else []
-        
+        query_category = self._classify_query(user_message)
+        search_results = []
+
+        if web_search and self._requires_web_search(user_message, query_category):
+            search_results = self._search_web(user_message)
+
         if self.provider == "gemini":
-            return self._generate_gemini_response(user_message, recent_history)
-        elif self.provider == "openai":
-            return self._generate_openai_response(user_message, recent_history)
-        elif self.provider == "mock":
-            return self._generate_mock_response(user_message, recent_history)
+            return self._generate_gemini_response(
+                user_message,
+                recent_history,
+                query_category,
+                search_results,
+                response_mode,
+            )
+        if self.provider == "openai":
+            return self._generate_openai_response(
+                user_message,
+                recent_history,
+                query_category,
+                search_results,
+                response_mode,
+            )
+        if self.provider == "mock":
+            return self._generate_mock_response(
+                user_message,
+                recent_history,
+                query_category,
+                search_results,
+                response_mode,
+            )
+
         raise Exception(f"No available provider could be initialized for {self.provider}")
-    
+
     def _activate_mock(self):
         self.provider = "mock"
         self.model = None
         self.client = None
 
-    def _generate_mock_response(self, user_message: str, conversation_history: List[Message]) -> str:
-        user_msg_lower = user_message.lower()
-        mock_responses = {
-            "hello": "Hello! I am running in mock mode because no API key is configured. Please add GEMINI_API_KEY or OPENAI_API_KEY in backend/.env for real responses.",
-            "how are you": "I'm a mock chatbot running locally. Configure an API key to use a real language model.",
-            "what is your name": "I'm an AI Chatbot mock responder. Configure a real provider in backend/.env for full functionality.",
-            "what can you do": "I can simulate responses locally. Add a valid API key to get real Google-style search answer formatting.",
-            "bye": "Goodbye! Add a provider key and restart the backend to use live AI responses."
+    def _classify_query(self, user_message: str) -> str:
+        lower_message = user_message.lower()
+
+        if any(keyword in lower_message for keyword in ["python", "javascript", "java", "code", "debug", "error", "function", "class", "api", "sql", "programming"]):
+            return "Programming and Coding"
+        if any(keyword in lower_message for keyword in ["math", "equation", "solve", "calculate", "percentage", "algebra", "geometry", "logic", "prove"]):
+            return "Mathematics and Logical Reasoning"
+        if any(keyword in lower_message for keyword in ["summarize", "notes", "study", "explain", "learn", "concept", "tutorial", "lesson", "education"]):
+            return "Education and Learning"
+        if any(keyword in lower_message for keyword in ["latest", "current", "now", "today", "news", "2026", "2025", "research", "market", "trend", "recent"]):
+            return "Current Information and Web Research"
+        if any(keyword in lower_message for keyword in ["compare", "difference", "vs", "pros", "cons", "analysis", "research"]):
+            return "Research and Analysis"
+        if any(keyword in lower_message for keyword in ["email", "write", "draft", "proposal", "resume", "cover letter", "content", "article"]):
+            return "Writing and Content Generation"
+        if any(keyword in lower_message for keyword in ["business", "strategy", "marketing", "sales", "team", "management", "report"]):
+            return "Business and Professional Tasks"
+        if any(keyword in lower_message for keyword in ["translate", "hindi", "spanish", "french", "german", "language"]):
+            return "Translation and Language"
+        return "General Knowledge"
+
+    def _requires_web_search(self, user_message: str, query_category: str) -> bool:
+        lower_message = user_message.lower()
+        current_keywords = [
+            "latest",
+            "current",
+            "today",
+            "recent",
+            "news",
+            "2025",
+            "2026",
+            "upcoming",
+            "this week",
+            "this month",
+            "year",
+        ]
+        if query_category in {"Current Information and Web Research", "Research and Analysis"}:
+            return True
+        return any(keyword in lower_message for keyword in current_keywords)
+
+    def _build_strategy_prompt(self, query_category: str, response_mode: str, web_results: List[Dict[str, str]]) -> str:
+        mode_map = {
+            "concise": "Give a short, direct response with only the most important points.",
+            "balanced": "Give a clear, balanced answer with helpful structure and examples.",
+            "detailed": "Give a thorough explanation with deeper analysis, examples, and step-by-step breakdowns.",
         }
-        for key, response in mock_responses.items():
-            if key in user_msg_lower:
-                return response
-        return (
-            "I currently do not have an API key configured to fetch real search results. "
-            "Please add a valid GEMINI_API_KEY or OPENAI_API_KEY in backend/.env and restart the backend."
+
+        base = (
+            f"You are Nexus AI, a helpful assistant. "
+            f"Query category: {query_category}. "
+            f"Response mode: {response_mode}. "
+            f"{mode_map.get(response_mode, mode_map['balanced'])} "
+            f"Use headings, bullet points, and code blocks when useful. "
+            f"If the user asks for code, include a working example and brief explanation. "
+            f"If the user asks for comparison, use a table or structured comparison. "
         )
-    
-    def _generate_gemini_response(self, user_message: str, conversation_history: List[Message]) -> str:
-        """Generate response using Google Gemini."""
+
+        if web_results:
+            source_context = "\n".join(
+                f"- {item.get('title', 'Source')}: {item.get('snippet', '')} ({item.get('url', '')})"
+                for item in web_results[:5]
+            )
+            base += f"Use the following current web research context only when relevant: \n{source_context}\n"
+
+        return base
+
+    def _search_web(self, query: str) -> List[Dict[str, str]]:
+        encoded_query = quote(query)
+        url = f"https://duckduckgo.com/html/?q={encoded_query}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
         try:
-            # Build the conversation for context
-            chat = self.model.start_chat(history=[])
-            
-            # Add conversation history to the chat
-            for msg in conversation_history:
-                chat.send_message(
-                    msg.content,
-                    stream=False
-                )
-            
-            # Get response for the current message
-            response = chat.send_message(user_message, stream=False)
-            return f"According to Google-style search results: {response.text}"
-        except Exception as e:
-            raise Exception(f"Error generating Gemini response: {str(e)}")
-    
-    def _generate_openai_response(self, user_message: str, conversation_history: List[Message]) -> str:
-        """Generate response using OpenAI API."""
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+        except requests.RequestException:
+            return []
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        results: List[Dict[str, str]] = []
+
+        for result in soup.select(".result")[:5]:
+            title_link = result.select_one("a.result-link") or result.select_one("a")
+            snippet = result.select_one(".result__snippet") or result.select_one(".snippet")
+            if not title_link:
+                continue
+            title = title_link.get_text(" ", strip=True)
+            href = title_link.get("href", "")
+            snippet_text = snippet.get_text(" ", strip=True) if snippet else ""
+            if title and href:
+                results.append({"title": title, "url": href, "snippet": snippet_text})
+
+        return results
+
+    def _build_provider_messages(
+        self,
+        user_message: str,
+        conversation_history: List[Message],
+        query_category: str,
+        web_results: List[Dict[str, str]],
+        response_mode: str,
+    ) -> List[Dict[str, str]]:
+        system_content = self._build_strategy_prompt(query_category, response_mode, web_results)
+        messages = [{"role": "system", "content": system_content}]
+
+        for msg in conversation_history:
+            messages.append({"role": msg.role, "content": msg.content})
+
+        messages.append({"role": "user", "content": user_message})
+        return messages
+
+    def _generate_mock_response(
+        self,
+        user_message: str,
+        conversation_history: List[Message],
+        query_category: str,
+        web_results: List[Dict[str, str]],
+        response_mode: str,
+    ) -> Dict[str, Any]:
+        lower_message = user_message.lower()
+        friendly_intro = "Here is a helpful answer based on the current session."
+
+        if "hello" in lower_message:
+            response_text = "Hello! I’m Nexus AI. I can explain concepts, write code, summarize notes, and help with research queries."
+        elif "how are you" in lower_message:
+            response_text = "I’m doing well and ready to help. Ask me to explain a topic, debug code, compare tools, or summarize complex information."
+        elif "python" in lower_message and "function" in lower_message:
+            response_text = """## Python function example
+```python
+def greet(name):
+    return f'Hello, {name}!'
+
+print(greet('Rahul'))
+```
+This function takes a name and returns a greeting string.
+"""
+        elif query_category == "Current Information and Web Research":
+            response_text = (
+                "## Current information note\n"
+                "I can search public sources when web research is enabled, but live verification requires a real API key or a web-search service. "
+                "Once connected, I can list recent sources and summarize the most relevant updates."
+            )
+        else:
+            response_text = (
+                f"## {query_category}\n"
+                f"{friendly_intro}\n\n"
+                "- Start with the key idea\n"
+                "- Add a concrete example\n"
+                "- Include a short takeaway\n\n"
+                "Example: if you ask for a summary, I can structure it into key points, examples, and action steps."
+            )
+
+        return {"text": response_text, "sources": web_results[:5]}
+
+    def _generate_gemini_response(
+        self,
+        user_message: str,
+        conversation_history: List[Message],
+        query_category: str,
+        web_results: List[Dict[str, str]],
+        response_mode: str,
+    ) -> Dict[str, Any]:
         try:
-            messages = [
-                {"role": "system", "content": self.system_prompt}
-            ]
-            
-            # Add conversation history
+            prompt = self._build_strategy_prompt(query_category, response_mode, web_results)
+            prompt += f"\n\nConversation history:\n"
             for msg in conversation_history:
-                messages.append({
-                    "role": msg.role,
-                    "content": msg.content
-                })
-            
-            # Add current user message
-            messages.append({
-                "role": "user",
-                "content": user_message
-            })
-            
+                prompt += f"{msg.role}: {msg.content}\n"
+            prompt += f"\nCurrent user message:\n{user_message}\n"
+
+            response = self.model.generate_content(prompt)
+            text = getattr(response, "text", str(response)).strip()
+            return {"text": text or "I couldn’t generate a response right now.", "sources": web_results[:5]}
+        except Exception as exc:
+            raise Exception(f"Error generating Gemini response: {str(exc)}") from exc
+
+    def _generate_openai_response(
+        self,
+        user_message: str,
+        conversation_history: List[Message],
+        query_category: str,
+        web_results: List[Dict[str, str]],
+        response_mode: str,
+    ) -> Dict[str, Any]:
+        try:
+            messages = self._build_provider_messages(
+                user_message,
+                conversation_history,
+                query_category,
+                web_results,
+                response_mode,
+            )
             response = self.client.chat.completions.create(
                 model=settings.MODEL_NAME,
                 messages=messages,
                 temperature=self.temperature,
                 top_p=self.top_p,
-                max_tokens=1000
+                max_tokens=1200,
             )
-            
-            return response.choices[0].message.content
-        except Exception as e:
-            raise Exception(f"Error generating OpenAI response: {str(e)}")
+            text = response.choices[0].message.content
+            return {"text": text, "sources": web_results[:5]}
+        except Exception as exc:
+            raise Exception(f"Error generating OpenAI response: {str(exc)}") from exc
+
 
 class MockChatbotService(ChatbotService):
-    """Mock chatbot service for development/testing without API keys."""
-    
+    """Backwards-compatible mock chatbot service."""
+
     def __init__(self):
         self.provider = "mock"
         self.system_prompt = settings.SYSTEM_PROMPT
         self.temperature = settings.TEMPERATURE
         self.top_p = settings.TOP_P
         self.max_history = settings.MAX_HISTORY
-    
-    def generate_response(self, user_message: str, conversation_history: List[Message]) -> str:
-        """Return mock responses for development."""
-        user_msg_lower = user_message.lower()
-        
-        mock_responses = {
-            "hello": "Hello! How can I help you today?",
-            "how are you": "I'm doing great! Thanks for asking. How can I assist you?",
-            "what is your name": "I'm an AI Chatbot, your friendly virtual assistant!",
-            "what can you do": "I can help answer questions, have conversations, and provide information on various topics.",
-            "bye": "Goodbye! Feel free to come back whenever you need help.",
-        }
-        
-        for key, response in mock_responses.items():
-            if key in user_msg_lower:
-                return response
-        
-        return "I currently do not have an API key configured to fetch real search results. Please add a valid LLM provider key in the backend configuration."
+
+    def generate_response(
+        self,
+        user_message: str,
+        conversation_history: List[Message],
+        web_search: bool = False,
+        response_mode: str = "balanced",
+    ) -> Dict[str, Any]:
+        return super()._generate_mock_response(
+            user_message,
+            conversation_history,
+            "General Knowledge",
+            [],
+            response_mode,
+        )

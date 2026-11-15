@@ -4,6 +4,13 @@ import ChatInterface from './components/ChatInterface';
 import './App.css';
 
 const API_BASE_URL = 'http://localhost:8000/api';
+const SUGGESTED_PROMPTS = [
+  'Explain machine learning in simple terms',
+  'Write a Python function for API validation',
+  'Compare Python and Java for backend work',
+  'What are the latest AI developments in 2026?',
+  'Summarize database normalization'
+];
 
 function App() {
   const [messages, setMessages] = useState([]);
@@ -11,11 +18,22 @@ function App() {
   const [error, setError] = useState(null);
   const [provider, setProvider] = useState('gemini');
   const [configStatus, setConfigStatus] = useState(null);
+  const [webSearch, setWebSearch] = useState(false);
+  const [responseMode, setResponseMode] = useState('balanced');
+  const [attachments, setAttachments] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const abortControllerRef = useRef(null);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const buildConversationHistory = (history) =>
+    history.map((msg) => ({
+      role: msg.sender === 'user' ? 'user' : 'assistant',
+      content: msg.text
+    }));
 
   useEffect(() => {
     scrollToBottom();
@@ -30,155 +48,242 @@ function App() {
           setProvider(response.data.active_provider);
         }
       } catch (err) {
-        setConfigStatus({ status: 'unknown', message: 'Unable to verify backend provider configuration.' });
+        setConfigStatus({
+          status: 'unknown',
+          message: 'Unable to verify backend provider configuration.'
+        });
       }
     };
 
     fetchConfigStatus();
   }, []);
 
-  const sendMessage = async (userMessage) => {
-    if (!userMessage.trim()) return;
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setLoading(false);
+    setError('Generation stopped by the user.');
+  };
 
-    // Add user message to chat
-    const newMessage = {
+  const sendMessage = async (userMessage) => {
+    const trimmedMessage = userMessage.trim();
+    if (!trimmedMessage) return;
+
+    const userMessageEntry = {
       id: Date.now(),
-      text: userMessage,
+      text: trimmedMessage,
       sender: 'user',
       timestamp: new Date().toLocaleTimeString()
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    const nextMessages = [...messages, userMessageEntry];
+    setMessages(nextMessages);
     setLoading(true);
     setError(null);
 
+    const requestBody = {
+      message: trimmedMessage,
+      provider,
+      web_search: webSearch,
+      response_mode: responseMode,
+      conversation_history: buildConversationHistory(nextMessages)
+    };
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      // Send to backend API
-      const response = await axios.post(`${API_BASE_URL}/chat`, {
-        message: userMessage,
-        provider,
-        conversation_history: messages.map(msg => ({
-          role: msg.sender === 'user' ? 'user' : 'assistant',
-          content: msg.text
-        }))
+      const response = await axios.post(`${API_BASE_URL}/chat`, requestBody, {
+        signal: controller.signal
       });
 
-      // Add bot response to chat
-      const botMessage = {
+      const assistantMessage = {
         id: Date.now() + 1,
         text: response.data.response,
-        sender: 'bot',
-        timestamp: new Date().toLocaleTimeString()
+        sender: 'assistant',
+        timestamp: new Date().toLocaleTimeString(),
+        sources: response.data.sources || []
       };
 
-      setMessages(prev => [...prev, botMessage]);
+      setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
+      if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
+
       const backendDetail = err.response?.data?.detail;
       const missingKeyError = backendDetail && backendDetail.includes('not set in environment variables');
       if (missingKeyError) {
         setError(
-          'No valid LLM API key is configured. Please update backend/.env with a valid GEMINI_API_KEY or OPENAI_API_KEY and restart the backend.'
+          'No valid LLM API key is configured. Please add GEMINI_API_KEY or OPENAI_API_KEY in the root .env file and restart the backend.'
         );
       } else {
-        setError(backendDetail || 'Failed to get response from the AI. Please try again.');
+        setError(backendDetail || 'Failed to get a response from the AI. Please try again.');
       }
       console.error('Error:', err);
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
   const clearChat = () => {
     setMessages([]);
     setError(null);
+    setAttachments([]);
+  };
+
+  const handleAttachment = (event) => {
+    const files = Array.from(event.target.files || []);
+    setAttachments(files.map((file) => file.name));
+  };
+
+  const copyMessage = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setError('Response copied to clipboard.');
+    } catch (err) {
+      setError('Unable to copy the response.');
+    }
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gradient-to-br from-dark-bg to-dark-card">
-      <header className="bg-gradient-to-r from-accent-blue to-blue-600 text-white p-4 shadow-lg">
-        <h1 className="text-2xl font-bold">Enterprise AI Research Assistant</h1>
-        <p className="text-blue-100 text-sm">Multi-provider research assistant with conversational context and enterprise-grade architecture</p>
-      </header>
-
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {configStatus && configStatus.status !== 'ready' && (
-          <div className="bg-yellow-600/20 border border-yellow-500 text-yellow-100 px-4 py-3 rounded-lg">
-            <strong className="font-semibold">Provider configuration issue:</strong>
-            <p className="mt-1 text-sm">
-              {configStatus.status === 'mock'
-                ? 'No valid LLM provider is configured. The app is running in mock mode until a valid GEMINI_API_KEY or OPENAI_API_KEY is set.'
-                : configStatus.missing_keys && configStatus.missing_keys.length > 0
-                ? `Missing ${configStatus.missing_keys.join(', ')} for MODEL_PROVIDER=${configStatus.configured_provider}.`
-                : 'No valid LLM provider is configured. Please set GEMINI_API_KEY or OPENAI_API_KEY in backend/.env.'}
-            </p>
-          </div>
-        )}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+    <div className="app-shell">
+      <aside className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
+        <div className="sidebar-header">
           <div>
-            <p className="text-sm text-gray-300">Select an AI provider for your conversation.</p>
+            <p className="eyebrow">Workspace</p>
+            <h2>Nexus AI</h2>
           </div>
-          <div className="flex items-center gap-3">
-            <label htmlFor="provider" className="text-sm text-gray-200">Provider</label>
-            <select
-              id="provider"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="bg-gray-800 text-white border border-dark-border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-accent-blue"
-            >
+          <button type="button" className="ghost-button" onClick={() => setSidebarOpen((prev) => !prev)}>
+            {sidebarOpen ? 'Hide' : 'Show'}
+          </button>
+        </div>
+
+        <button type="button" className="primary-button sidebar-action" onClick={clearChat}>
+          + New chat
+        </button>
+
+        <div className="sidebar-search">
+          <input type="text" placeholder="Search chats" aria-label="Search chats" />
+        </div>
+
+        <div className="sidebar-section">
+          <p className="section-label">Quick actions</p>
+          <ul className="history-list">
+            {SUGGESTED_PROMPTS.slice(0, 4).map((prompt) => (
+              <li key={prompt}>
+                <button type="button" onClick={() => sendMessage(prompt)}>
+                  {prompt}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+
+      <main className="chat-panel">
+        <header className="topbar">
+          <div className="brand-block">
+            <div className="brand-mark">N</div>
+            <div>
+              <h1>Nexus AI</h1>
+              <p>Intelligent assistant</p>
+            </div>
+          </div>
+
+          <div className="header-controls">
+            <label htmlFor="provider" className="control-label">Model</label>
+            <select id="provider" value={provider} onChange={(event) => setProvider(event.target.value)}>
               <option value="gemini">Gemini</option>
               <option value="openai">GPT-4.1</option>
             </select>
           </div>
-        </div>
-        {messages.length === 0 && (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <h2 className="text-2xl font-semibold text-gray-300 mb-2">Welcome to the Enterprise AI Chatbot Platform</h2>
-              <p className="text-gray-400">Start a conversation and explore multi-provider AI model integration.</p>
-            </div>
+        </header>
+
+        {configStatus && configStatus.status !== 'ready' && (
+          <div className="status-banner warning">
+            <strong>Provider status:</strong>
+            <span>
+              {configStatus.status === 'mock'
+                ? 'No valid API key is configured yet. Mock mode is active.'
+                : configStatus.message}
+            </span>
           </div>
         )}
 
-        {messages.map(message => (
-          <div
-            key={message.id}
-            className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-md px-4 py-2 rounded-lg ${
-                message.sender === 'user'
-                  ? 'bg-accent-blue text-white rounded-br-none'
-                  : 'bg-dark-card text-gray-200 rounded-bl-none border border-dark-border'
-              }`}
-            >
-              <p className="break-words">{message.text}</p>
-              <span className="text-xs opacity-70 mt-1 block">{message.timestamp}</span>
-            </div>
-          </div>
-        ))}
-
-        {loading && (
-          <div className="flex justify-start">
-            <div className="bg-dark-card text-gray-200 px-4 py-2 rounded-lg border border-dark-border rounded-bl-none">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+        <div className="conversation-container">
+          {messages.length === 0 ? (
+            <div className="welcome-panel">
+              <p className="eyebrow">Ready to help</p>
+              <h2>Ask anything. Research anything. Build faster.</h2>
+              <div className="prompt-grid">
+                {SUGGESTED_PROMPTS.map((prompt) => (
+                  <button key={prompt} type="button" className="prompt-chip" onClick={() => sendMessage(prompt)}>
+                    {prompt}
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="message-list">
+              {messages.map((message) => (
+                <div key={message.id} className={`message-row ${message.sender === 'user' ? 'outgoing' : 'incoming'}`}>
+                  <div className="message-bubble">
+                    <p>{message.text}</p>
+                    <div className="message-meta">
+                      <span>{message.timestamp}</span>
+                      {message.sender === 'assistant' && (
+                        <div className="toolbar">
+                          <button type="button" onClick={() => copyMessage(message.text)}>Copy</button>
+                          <button type="button" onClick={() => sendMessage(`Explain this in simpler terms: ${message.text}`)}>Simplify</button>
+                        </div>
+                      )}
+                    </div>
+                    {message.sources && message.sources.length > 0 && (
+                      <div className="source-list">
+                        {message.sources.map((source) => (
+                          <a key={`${source.url}-${source.title}`} href={source.url} target="_blank" rel="noreferrer">
+                            {source.title}
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
 
-        {error && (
-          <div className="bg-red-900 bg-opacity-30 border border-red-600 text-red-200 px-4 py-2 rounded">
-            {error}
-          </div>
-        )}
+              {loading && (
+                <div className="message-row incoming">
+                  <div className="message-bubble typing-bubble">
+                    <span /><span /><span />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-        <div ref={messagesEndRef} />
-      </div>
+          {error && <div className="status-banner error">{error}</div>}
+          <div ref={messagesEndRef} />
+        </div>
 
-      <ChatInterface onSendMessage={sendMessage} isSending={loading} onClear={clearChat} disabled={configStatus?.status === 'unknown'} />
+        <ChatInterface
+          onSendMessage={sendMessage}
+          isSending={loading}
+          onClear={clearChat}
+          onStop={stopGeneration}
+          onAttachFile={handleAttachment}
+          attachments={attachments}
+          disabled={configStatus?.status === 'unknown'}
+          webSearch={webSearch}
+          setWebSearch={setWebSearch}
+          responseMode={responseMode}
+          setResponseMode={setResponseMode}
+          suggestedPrompts={SUGGESTED_PROMPTS}
+        />
+      </main>
     </div>
   );
 }

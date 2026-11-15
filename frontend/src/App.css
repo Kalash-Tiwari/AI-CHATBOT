@@ -1,1 +1,497 @@
-/* Additional styles if needed */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1f2f48 0%, #09111b 35%, #050b12 100%);
+  color: #ebf0ff;
+}
+
+.sidebar {
+  width: 290px;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(12px);
+  transition: width 0.2s ease;
+}
+
+.sidebar.closed {
+  width: 84px;
+}
+
+.sidebar.closed .sidebar-header h2,
+.sidebar.closed .sidebar-search,
+.sidebar.closed .sidebar-section,
+.sidebar.closed .sidebar-action {
+  display: none;
+}
+
+.sidebar-header,
+.brand-block,
+.topbar,
+.message-meta,
+.composer-actions,
+.composer-controls,
+.toolbar,
+.source-list {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-header,
+.topbar,
+.message-meta,
+.composer-controls {
+  justify-content: space-between;
+}
+
+.sidebar-header {
+  margin-bottom: 1.5rem;
+}
+
+.eyebrow,
+.section-label {
+  margin: 0;
+  color: #8ea6d9;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sidebar-header h2,
+.topbar h1,
+.welcome-panel h2 {
+  margin: 0;
+}
+
+.sidebar-search {
+  margin-bottom: 1.25rem;
+}
+
+.sidebar-search input,
+.header-controls select,
+.composer-controls select,
+.composer-box textarea {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  color: #ebf0ff;
+  font: inherit;
+}
+
+.sidebar-search input {
+  padding: 0.8rem 0.9rem;
+}
+
+.sidebar-section {
+  margin-top: 1rem;
+}
+
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.history-list button,
+.prompt-chip,
+.prompt-pill,
+.ghost-button,
+.toggle-pill,
+.primary-button,
+.secondary-button,
+.danger-button,
+.toolbar button {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+.history-list button,
+.prompt-chip,
+.prompt-pill {
+  width: 100%;
+  background: rgba(30, 41, 59, 0.9);
+  color: #dbeafe;
+  border: 1px solid rgba(96, 165, 250, 0.2);
+  border-radius: 12px;
+  padding: 0.7rem 0.9rem;
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.history-list button:hover,
+.prompt-chip:hover,
+.prompt-pill:hover,
+.ghost-button:hover,
+.primary-button:hover,
+.secondary-button:hover,
+.danger-button:hover,
+.toolbar button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button,
+.danger-button {
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.primary-button {
+  background: linear-gradient(135deg, #4f8cff 0%, #2f6df6 100%);
+  color: white;
+}
+
+.secondary-button {
+  background: rgba(148, 163, 184, 0.1);
+  color: #f8fbff;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.danger-button {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+.ghost-button {
+  background: rgba(148, 163, 184, 0.1);
+  color: #dbeafe;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.brand-block {
+  gap: 0.85rem;
+}
+
+.brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(59, 130, 246, 0.9));
+}
+
+.topbar h1 {
+  font-size: 1.2rem;
+}
+
+.topbar p {
+  margin: 0.2rem 0 0;
+  color: #b9c6df;
+  font-size: 0.8rem;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.control-label {
+  color: #dbeafe;
+  font-size: 0.8rem;
+}
+
+.header-controls select,
+.composer-controls select {
+  padding: 0.7rem 0.9rem;
+  min-width: 120px;
+}
+
+.status-banner {
+  margin: 1rem 1.5rem 0;
+  display: flex;
+  gap: 0.5rem;
+  border-radius: 14px;
+  padding: 0.8rem 1rem;
+}
+
+.status-banner.warning {
+  background: rgba(234, 179, 8, 0.08);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #fef3c7;
+}
+
+.status-banner.error {
+  margin: 0 1.5rem 1rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #fecaca;
+}
+
+.conversation-container {
+  flex: 1;
+  overflow: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.welcome-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+  border-radius: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.welcome-panel h2 {
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  max-width: 700px;
+  margin-top: 0.35rem;
+}
+
+.prompt-grid {
+  margin-top: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.prompt-chip {
+  width: auto;
+  background: rgba(30, 41, 59, 0.7);
+  padding: 0.8rem 1rem;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-bottom: 1rem;
+}
+
+.message-row {
+  display: flex;
+}
+
+.message-row.outgoing {
+  justify-content: flex-end;
+}
+
+.message-row.incoming {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: min(68%, 760px);
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.28);
+}
+
+.message-row.outgoing .message-bubble {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.95), rgba(98, 92, 238, 0.9));
+  border-color: transparent;
+}
+
+.message-bubble p {
+  margin: 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.message-meta {
+  margin-top: 0.75rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.toolbar {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.toolbar button {
+  background: rgba(15, 23, 42, 0.18);
+  color: inherit;
+  padding: 0.35rem 0.5rem;
+  border-radius: 999px;
+}
+
+.source-list {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.source-list a {
+  color: #dbeafe;
+  text-decoration: none;
+  font-size: 0.74rem;
+  background: rgba(30, 41, 59, 0.8);
+  border-radius: 999px;
+  padding: 0.35rem 0.55rem;
+}
+
+.typing-bubble {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 98px;
+}
+
+.typing-bubble span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #bfd3ff;
+  animation: bounce 1s ease-in-out infinite;
+}
+
+.typing-bubble span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-bubble span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bounce {
+  0%,
+  80%,
+  100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+.composer-panel {
+  padding: 1rem 1.5rem 1.3rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.68);
+}
+
+.composer-controls {
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.75);
+  color: #dbeafe;
+}
+
+.toggle-pill input {
+  accent-color: #4f8cff;
+}
+
+.attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.attachment-list span {
+  background: rgba(79, 140, 255, 0.15);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #dbeafe;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.72rem;
+}
+
+.composer-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.85rem;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 0.8rem 0.9rem;
+}
+
+.composer-box textarea {
+  resize: none;
+  min-height: 52px;
+  max-height: 180px;
+  padding: 0.75rem 0.2rem;
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.composer-actions {
+  gap: 0.6rem;
+}
+
+.prompt-row {
+  margin-top: 0.8rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.prompt-pill {
+  width: auto;
+  padding: 0.55rem 0.8rem;
+  background: rgba(30, 41, 59, 0.72);
+  color: #dbeafe;
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  }
+
+  .message-bubble {
+    max-width: 90%;
+  }
+
+  .composer-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .composer-actions {
+    justify-content: flex-end;
+  }
+}
+
