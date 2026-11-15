@@ -109,6 +109,44 @@ def _evaluate_provider_status():
     }
 
 
+@router.get("/models")
+async def list_models():
+    return {
+        "providers": [
+            {
+                "name": "gemini",
+                "enabled": _is_valid_key(settings.GEMINI_API_KEY),
+                "model": settings.GEMINI_MODEL,
+            },
+            {
+                "name": "openai",
+                "enabled": _is_valid_key(settings.OPENAI_API_KEY),
+                "model": settings.OPENAI_MODEL,
+            },
+            {
+                "name": "claude",
+                "enabled": _is_valid_key(settings.ANTHROPIC_API_KEY),
+                "model": settings.ANTHROPIC_MODEL,
+            },
+        ],
+        "default_provider": settings.MODEL_PROVIDER,
+    }
+
+
+@router.get("/models/health")
+async def models_health():
+    payload = list_models()
+    return {
+        "status": "ok",
+        "providers": payload["providers"],
+    }
+
+
+@router.get("/chat/status")
+async def chat_status():
+    return _evaluate_provider_status()
+
+
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
