@@ -2,7 +2,6 @@
 Chatbot service for interacting with foundation model APIs.
 """
 
-import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
@@ -44,6 +43,7 @@ class ChatbotService:
 
         gemini_available = self._is_valid_api_key(settings.GEMINI_API_KEY)
         openai_available = self._is_valid_api_key(settings.OPENAI_API_KEY)
+        anthropic_available = self._is_valid_api_key(settings.ANTHROPIC_API_KEY)
 
         if self.provider == "gemini":
             if gemini_available:
@@ -51,6 +51,9 @@ class ChatbotService:
             elif openai_available:
                 self.provider = "openai"
                 self._init_openai()
+            elif anthropic_available:
+                self.provider = "claude"
+                self._init_claude()
             else:
                 self._activate_mock()
         elif self.provider == "openai":
@@ -59,6 +62,20 @@ class ChatbotService:
             elif gemini_available:
                 self.provider = "gemini"
                 self._init_gemini()
+            elif anthropic_available:
+                self.provider = "claude"
+                self._init_claude()
+            else:
+                self._activate_mock()
+        elif self.provider == "claude":
+            if anthropic_available:
+                self._init_claude()
+            elif gemini_available:
+                self.provider = "gemini"
+                self._init_gemini()
+            elif openai_available:
+                self.provider = "openai"
+                self._init_openai()
             else:
                 self._activate_mock()
         else:
@@ -68,6 +85,9 @@ class ChatbotService:
             elif openai_available:
                 self.provider = "openai"
                 self._init_openai()
+            elif anthropic_available:
+                self.provider = "claude"
+                self._init_claude()
             else:
                 self._activate_mock()
 
@@ -83,6 +103,13 @@ class ChatbotService:
         from openai import OpenAI
 
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+    def _init_claude(self):
+        if not settings.ANTHROPIC_API_KEY:
+            raise ValueError("ANTHROPIC_API_KEY not set in environment variables")
+        from anthropic import Anthropic
+
+        self.client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
     def generate_response(
         self,
@@ -108,6 +135,14 @@ class ChatbotService:
             )
         if self.provider == "openai":
             return self._generate_openai_response(
+                user_message,
+                recent_history,
+                query_category,
+                search_results,
+                response_mode,
+            )
+        if self.provider == "claude":
+            return self._generate_claude_response(
                 user_message,
                 recent_history,
                 query_category,
@@ -331,7 +366,7 @@ This function takes a name and returns a greeting string.
                 response_mode,
             )
             response = self.client.chat.completions.create(
-                model=settings.MODEL_NAME,
+                model=settings.OPENAI_MODEL if settings.OPENAI_MODEL else settings.MODEL_NAME,
                 messages=messages,
                 temperature=self.temperature,
                 top_p=self.top_p,
@@ -349,6 +384,42 @@ This function takes a name and returns a greeting string.
                     response_mode,
                 )
             raise Exception(f"Error generating OpenAI response: {str(exc)}") from exc
+
+    def _generate_claude_response(
+        self,
+        user_message: str,
+        conversation_history: List[Message],
+        query_category: str,
+        web_results: List[Dict[str, str]],
+        response_mode: str,
+    ) -> Dict[str, Any]:
+        try:
+            messages = self._build_provider_messages(
+                user_message,
+                conversation_history,
+                query_category,
+                web_results,
+                response_mode,
+            )
+            response = self.client.messages.create(
+                model=settings.ANTHROPIC_MODEL,
+                max_tokens=1200,
+                temperature=self.temperature,
+                system=self.system_prompt,
+                messages=[{"role": msg["role"], "content": msg["content"]} for msg in messages if msg["role"] != "system"],
+            )
+            text = response.content[0].text
+            return {"text": text, "sources": web_results[:5]}
+        except Exception as exc:
+            if "api key" in str(exc).lower() or "invalid" in str(exc).lower() or "quota" in str(exc).lower():
+                return self._generate_mock_response(
+                    user_message,
+                    conversation_history,
+                    query_category,
+                    web_results,
+                    response_mode,
+                )
+            raise Exception(f"Error generating Claude response: {str(exc)}") from exc
 
 
 class MockChatbotService(ChatbotService):
